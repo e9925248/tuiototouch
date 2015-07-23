@@ -20,13 +20,29 @@
 import tuio
 import uinput
 import time
+from copy import deepcopy
+
+def cmp_obj(a, b):
+    return a.sessionid == b.sessionid and a.xpos == b.xpos and a.ypos == b.ypos
+
+def cmp_dict(a, b):
+    if len(a) <> len(b):
+        return False
+    for obj in a:
+        if not cmp_obj(a[obj], b[obj]):
+            return False
+    return True
 
 class Device(object):
 
     def __init__(self, capabilities=()):
         self.objects=dict()
+	self.last=dict()
         self.empty=1
         capabilities += (uinput.BTN_TOUCH,
+                         uinput.ABS_MT_SLOT + (0, 10, 0, 0),
+                         uinput.ABS_X + (0, 1000, 0, 0),
+                         uinput.ABS_Y + (0, 1000, 0, 0),
                          uinput.ABS_MT_POSITION_X + (0, 1000, 0, 0),
                          uinput.ABS_MT_POSITION_Y + (0, 1000, 0, 0),
                          uinput.ABS_MT_TRACKING_ID + (0, 10, 0, 0))
@@ -39,6 +55,9 @@ class Device(object):
             self.objects[obj.sessionid]=obj
 
     def display(self):
+	if cmp_dict (self.last, self.objects):
+		return
+	self.last = deepcopy(self.objects)
         if (len(self.objects)==0) & self.empty:
             self.emit(uinput.BTN_TOUCH, 0)
             self.empty=0
@@ -54,9 +73,13 @@ class Device(object):
                 self.empty=1
 
     def treatment(self, obj):
+        if (obj.sessionid % 10) == 0:
+        	self.emit(uinput.ABS_X, int(obj.xpos*1000), syn=False)
+        	self.emit(uinput.ABS_Y, int(obj.ypos*1000), syn=False)
+        self.emit(uinput.ABS_MT_SLOT, obj.sessionid % 10, syn=False)
         self.emit(uinput.ABS_MT_TRACKING_ID, obj.sessionid, syn=False)
-        self.emit(uinput.ABS_MT_POSITION_X, obj.xpos*1000, syn=False)
-        self.emit(uinput.ABS_MT_POSITION_Y, obj.ypos*1000, syn=False)
+        self.emit(uinput.ABS_MT_POSITION_X, int(obj.xpos*1000), syn=False)
+        self.emit(uinput.ABS_MT_POSITION_Y, int(obj.ypos*1000), syn=False)
         self.emit((0, 2), 0, syn=False)
 
     def emit(self, event, value, syn=True):
